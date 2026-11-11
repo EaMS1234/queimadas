@@ -157,4 +157,4 @@ print(f'Número de municípios: {total_municipios}')
 print(f'Média de focos por município: {media_aparicoes:.2f}')
 
 # Salva o dataframe em um arquivo CSV
-df.to_csv("out.csv", index=False)
+df.to_csv("out/out.csv", index=False)
