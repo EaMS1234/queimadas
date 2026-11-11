@@ -167,3 +167,80 @@ def obter_dados_clima(dia, cidade, periodos=PERIODOS_PRECIPITACAO):
         resultado[f"prec{n}"] = sum(valores) / len(valores) if valores else None
 
     return resultado
+
+def obter_dados_clima_coord(dia, latitude, longitude, periodos=PERIODOS_PRECIPITACAO):
+    """Retorna todos os dados climáticos de `dia` para uma coordenada específica.
+
+    Retorno:
+        {
+            "latitude": latitude,
+            "longitude": longitude,
+            "data": date,
+            "precipitacao": mm do dia,
+            "temperatura": °C média do dia,
+            "umidade": % média do dia,
+            "prec1": mm/dia médio nos 1 dia anterior,
+            "prec2": ..., "prec3": ..., etc.
+        }
+
+    Nº de chamadas: 1 de clima se `dia` já está no arquivo histórico; 
+    2 de clima se o intervalo de 120 dias cruza o limite entre histórico e previsão.
+    """
+    if not isinstance(dia, date):
+        dia = date.fromisoformat(str(dia))
+
+    inicio = dia - timedelta(days=max(periodos))
+    limite = date.today() - timedelta(days=DIAS_ATRASO_HISTORICO)
+
+    # Define os trechos (url, inicio, fim) necessários
+    if dia <= limite:
+        trechos = [(URL_HISTORICO, inicio, dia)]
+    elif inicio > limite:
+        trechos = [(URL_PREVISAO, inicio, dia)]
+    else:
+        trechos = [
+            (URL_HISTORICO, inicio, limite),
+            (URL_PREVISAO, limite + timedelta(days=1), dia),
+        ]
+
+    precipitacao = {}
+    temperatura = {}
+    valores_umidade = []
+
+    for url, ini, fim in trechos:
+        # Umidade horária só é pedida no trecho que contém o próprio `dia`
+        horario = "relative_humidity_2m" if fim == dia else None
+        dados = _requisitar(url, ini, fim, latitude, longitude, horario)
+
+        diario = dados["daily"]
+        for d, prec, temp in zip(
+            diario["time"], diario["precipitation_sum"], diario["temperature_2m_mean"]
+        ):
+            d = date.fromisoformat(d)
+            precipitacao[d] = prec
+            temperatura[d] = temp
+
+        if horario:
+            horas = dados["hourly"]
+            valores_umidade = [
+                v
+                for t, v in zip(horas["time"], horas["relative_humidity_2m"])
+                if t.startswith(dia.isoformat()) and v is not None
+            ]
+
+    resultado = {
+        "latitude": latitude,
+        "longitude": longitude,
+        "data": dia,
+        "precipitacao": precipitacao.get(dia),
+        "temperatura": temperatura.get(dia),
+        "umidade": sum(valores_umidade) / len(valores_umidade) if valores_umidade else None,
+    }
+
+    # precN = média dos N dias anteriores (o próprio `dia` não entra)
+    for n in periodos:
+        valores = [precipitacao.get(dia - timedelta(days=i)) for i in range(1, n + 1)]
+        valores = [v for v in valores if v is not None]
+        resultado[f"prec{n}"] = sum(valores) / len(valores) if valores else None
+
+    return resultado

@@ -52,3 +52,4 @@ y_pred = gpc.predict(X_test_scaled)
 y_prob = gpc.predict_proba(X_test_scaled)
 
 pickle.dump(gpc, open(f'out/gpc-modelo-{ano}.pkl', 'wb'))
+pickle.dump(scaler, open(f'out/gpc-modelo-{ano}-scaler.pkl', 'wb'))
