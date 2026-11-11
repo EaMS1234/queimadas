@@ -17,20 +17,19 @@ def carregar_modelos(pasta):
     for arq in pasta.glob("*.pkl"):
         nome_base = arq.stem
         
-        if "-modelo-" not in nome_base:
-            continue
-            
-        if nome_base.endswith("-scaler"):
-            limpo = nome_base[:-7]
-            metodo, ano = limpo.split("-modelo-", 1)
-            
+        # Verifica se é o arquivo de scaler (ex: scaler-2023.pkl)
+        if nome_base.startswith("scaler-"):
+            ano = nome_base.split("-", 1)[1]
             with arq.open("rb") as f:
-                scalers[f"{metodo}_{ano}"] = pickle.load(f)
+                scalers[ano] = pickle.load(f)
+                
         else:
-            metodo, ano = nome_base.split("-modelo-", 1)
-            
-            with arq.open("rb") as f:
-                modelos[f"{metodo}_{ano}"] = pickle.load(f)
+            try:
+                metodo, ano = nome_base.rsplit("-", 1)
+                with arq.open("rb") as f:
+                    modelos[f"{metodo}_{ano}"] = pickle.load(f)
+            except ValueError:
+                continue
 
 def get_clima(lat, long, hora):
     hora = dt.fromisoformat(hora)
@@ -59,7 +58,7 @@ def prever(modelo):
     clima = get_clima(lat, long, hora)
     # bioma 2.5 = média entre 2 e 3, que são o fator de vegetação predominantes
     #             na mata atlântica e no cerrado, respectivamente
-    dados = scalers[modelo].transform([[
+    dados = scalers[modelo[-4:]].transform([[
         2.5,                      # Bioma
         clima[1],                 # DiaSemChuva
         clima[2]['precipitacao'], # Precipitacao
