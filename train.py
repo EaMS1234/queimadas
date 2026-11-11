@@ -6,6 +6,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel
 from sklearn.model_selection import train_test_split
 from sklearn.gaussian_process import GaussianProcessClassifier
+from sklearn.neural_network import MLPClassifier
 
 import pickle
 import os
@@ -46,10 +47,17 @@ gpc = GaussianProcessClassifier(
     n_jobs=-1
 )
 
+mlp = MLPClassifier(
+    hidden_layer_sizes=(8),
+    activation='relu',
+    solver='adam',
+    max_iter=500,
+    random_state=42
+)
+
 gpc.fit(X_train_scaled, y_train)
+mlp.fit(X_train_scaled, y_train)
 
-y_pred = gpc.predict(X_test_scaled)
-y_prob = gpc.predict_proba(X_test_scaled)
-
-pickle.dump(gpc, open(f'out/gpc-modelo-{ano}.pkl', 'wb'))
-pickle.dump(scaler, open(f'out/gpc-modelo-{ano}-scaler.pkl', 'wb'))
+pickle.dump(gpc, open(f'out/gpc-{ano}.pkl', 'wb'))
+pickle.dump(mlp, open(f'out/mlp-{ano}.pkl', 'wb'))
+pickle.dump(scaler, open(f'out/scaler-{ano}.pkl', 'wb'))
