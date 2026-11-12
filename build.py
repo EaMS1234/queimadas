@@ -27,6 +27,17 @@ def obter_com_retry(dia, municipio, max_tentativas=10):
             time.sleep(espera)
 
 
+def mostrar_progresso(municipio, mes, status):
+    decorrido = time.perf_counter() - inicio
+    restante = (decorrido / processados) * (total - processados)
+    print(
+        f'[{processados / total * 100:5.1f}%] {processados}/{total} | '
+        f'decorrido: {timedelta(seconds=int(decorrido))} | '
+        f'faltam ~{timedelta(seconds=int(restante))} | '
+        f'{status}: {municipio} {mes}'
+    )
+
+
 arquivo = 'bdqueimadas.csv'
 
 nome = input('  Nome do arquivo (bdqueimadas.csv): ').strip()
@@ -92,25 +103,43 @@ df_agrupado = df.groupby('Municipio')['DataHora'].unique()
 # Vegetação por município calculada uma vez só (evita filtrar o df a cada iteração)
 vegetacao_por_municipio = df.groupby('Municipio')['Bioma'].mean().to_dict()
 
-total = sum(len(meses_faltantes(m)) for m in municipios)
 processados = 0
 novas_linhas = []
 pulados = []
+
+if 'PeriodoSecura' not in df.columns:
+    df['PeriodoSecura'] = pd.NA   # entra no final do df
+
+# Total = linhas existentes sem PSE (etapa 1) + meses novos (etapa 2)
+pendentes_pse = int(df['PeriodoSecura'].isna().sum())
+novos = sum(len(meses_faltantes(m)) for m in municipios)
+total = pendentes_pse + novos
+
 inicio = time.perf_counter()
 
-
-def mostrar_progresso(municipio, mes, status):
-    decorrido = time.perf_counter() - inicio
-    restante = (decorrido / processados) * (total - processados)
-    print(
-        f'[{processados / total * 100:5.1f}%] {processados}/{total} | '
-        f'decorrido: {timedelta(seconds=int(decorrido))} | '
-        f'faltam ~{timedelta(seconds=int(restante))} | '
-        f'{status}: {municipio} {mes}'
-    )
-
+# Assumindo que mes e municipio são as duas primeiras colunas (mesma ordem de novas_linhas)
+col_mes, col_mun = df.columns[0], df.columns[1]
 
 try:
+    # 1) Linhas que já estavam no df: recalcula o PSE com a função
+    for idx in df.index[df['PeriodoSecura'].isna()]:
+        mes = df.at[idx, col_mes]
+        municipio = df.at[idx, col_mun]
+        dia = datetime.strptime(mes, '%Y-%m').date()
+
+        resultado = obter_com_retry(dia, municipio)
+        processados += 1
+
+        if resultado is None:
+            pulados.append((municipio, mes))
+            mostrar_progresso(municipio, mes, 'PULADO')
+            continue
+
+        precs = {k: v for k, v in resultado.items() if k.startswith('prec')}
+        df.at[idx, 'PeriodoSecura'] = q.periodo_de_secura(precs)
+        mostrar_progresso(municipio, mes, 'ok')
+
+    # 2) Meses novos
     for municipio in municipios:
         for mes in meses_faltantes(municipio):
             dia = datetime.strptime(mes, '%Y-%m').date()
@@ -132,7 +161,13 @@ try:
             pse = q.periodo_de_secura(precs)
             rf = q.risco_fogo(vegetacao, pse, umidade, temperatura)
 
-            novas_linhas.append([mes, municipio, vegetacao, pse, precipitacao, rf, 0])
+            # Ordem = colunas do df, com PeriodoSecura por último
+            novas_linhas.append([
+                mes, municipio, vegetacao,
+                resultado['diasemchuva'],   # DiaSemChuva
+                precipitacao, rf, 0,
+                pse,                        # PeriodoSecura
+            ])
             mostrar_progresso(municipio, mes, 'ok')
 
 finally:

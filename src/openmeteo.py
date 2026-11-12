@@ -86,6 +86,21 @@ def _requisitar(url, inicio, fim, lat, long, horario=None):
     resposta.raise_for_status()
     return resposta.json()
 
+def _dias_sem_chuva(dia, precipitacao, janela):
+    """Há quantos dias não chove, contando de `dia` para trás.
+
+    - 0 se choveu no próprio `dia`; 1 se choveu ontem e `dia` está seco; etc.
+    - Dias sem dado (None) são ignorados.
+    - Se não houver chuva em toda a janela (`janela` dias antes de `dia`, mais o
+      próprio `dia`), retorna janela + 1: o valor real é pelo menos esse.
+    """
+    LIMIAR_CHUVA_MM = 0.0
+
+    for i in range(janela + 1):
+        valor = precipitacao.get(dia - timedelta(days=i))
+        if valor is not None and valor > LIMIAR_CHUVA_MM:
+            return i
+    return janela + 1
 
 def obter_dados_clima(dia, cidade, periodos=PERIODOS_PRECIPITACAO):
     """Retorna todos os dados climáticos de `dia` para uma cidade do estado de SP.
@@ -158,6 +173,7 @@ def obter_dados_clima(dia, cidade, periodos=PERIODOS_PRECIPITACAO):
         "precipitacao": precipitacao.get(dia),
         "temperatura": temperatura.get(dia),
         "umidade": sum(valores_umidade) / len(valores_umidade) if valores_umidade else None,
+        "diasemchuva": _dias_sem_chuva(dia, precipitacao, max(periodos))
     }
 
     # precN = média dos N dias anteriores (o próprio `dia` não entra)
@@ -235,6 +251,7 @@ def obter_dados_clima_coord(dia, latitude, longitude, periodos=PERIODOS_PRECIPIT
         "precipitacao": precipitacao.get(dia),
         "temperatura": temperatura.get(dia),
         "umidade": sum(valores_umidade) / len(valores_umidade) if valores_umidade else None,
+        "diasemchuva": _dias_sem_chuva(dia, precipitacao, max(periodos))
     }
 
     # precN = média dos N dias anteriores (o próprio `dia` não entra)
