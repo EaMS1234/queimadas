@@ -1,0 +1,11 @@
+services:
+    api:
+        build: .
+        container_name: api
+        restart: unless-stopped
+        environment:
+          - MODELOS_DIR=/queimadas/out
+        ports:
+            - 5000:5000
+        volumes:
+            - ./out:/queimadas/out

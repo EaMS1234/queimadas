@@ -4,7 +4,7 @@ import openmeteo as om
 import queimada as qm
 import pickle
 from pathlib import Path
-import sys
+import os
 
 api = Flask(__name__)
 modelos = {}
@@ -12,6 +12,9 @@ scalers = {}
 
 
 def carregar_modelos(pasta):
+    if (pasta == None):
+        pasta = '../out/'
+
     pasta = Path(pasta)
     
     for arq in pasta.glob("*.pkl"):
@@ -80,15 +83,10 @@ def clima():
     return jsonify(risco_fogo=dados[0], periodo_de_secura=dados[1], clima=dados[2])
 
 
+carregar_modelos(os.getenv('MODELOS_DIR'))
+print(f'Modelos disponíveis: {modelos}')
+print(f'Scalers disponíveis: {scalers}')
+
+
 if __name__ == '__main__':
-    pasta = 'out/'
-    
-    try:
-        pasta = sys.argv[1]
-
-    except:
-        pasta = 'out/'
-
-    carregar_modelos(pasta)
-    print(modelos)
     api.run(debug=True, port=5000)
