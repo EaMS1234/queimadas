@@ -45,8 +45,12 @@ if not os.path.exists(arquivo):
 
 df = pd.read_csv(arquivo)
 
+ultima_entrada = int(input('Última entrada processada (índice, 0 para começar): '))
+
 # Filtra apenas os índices onde Fogo == 0
-indices_fogo_zero = df[df['Fogo'] == 0].index
+indices_fogo_zero = df[
+    (df['Fogo'] == 0) & (df.index > ultima_entrada)
+].index
 total = len(indices_fogo_zero)
 
 if total == 0:
@@ -87,11 +91,11 @@ try:
         df.at[idx, 'Precipitacao'] = precipitacao
         df.at[idx, 'RiscoFogo'] = q.risco_fogo(vegetacao, pse, umidade, temperatura)
 
+        df.to_csv(arquivo, index=False)
         mostrar_progresso(municipio, mes, 'ok', processados, total)
 
 finally:
     # Salva o DataFrame atualizado de volta no arquivo CSV
-    df.to_csv(arquivo, index=False)
     print(f'\nAtualização concluída e salva em: {arquivo}')
 
 print(f'Total de entradas puladas: {len(pulados)}')
